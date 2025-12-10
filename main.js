@@ -13,6 +13,11 @@ const JUMP_FORCE = 16;
 const MAX_FALL = 16;
 const COYOTE_FRAMES = 10;
 
+const GRAVITY = 0.65;
+const MOVE_SPEED = 4.2;
+const JUMP_FORCE = 12.5;
+const MAX_FALL = 16;
+
 const input = {
   left: false,
   right: false,
@@ -60,6 +65,12 @@ function hazardHitbox(h) {
   };
 }
 
+
+  { x: 620, y: HEIGHT - 40, w: 90, h: 32 },
+  { x: 1600, y: HEIGHT - 40, w: 70, h: 32 },
+  { x: 2320, y: HEIGHT - 40, w: 120, h: 32 },
+];
+
 class Player {
   constructor() {
     this.reset();
@@ -90,6 +101,9 @@ class Player {
       this.grounded = false;
       this.coyoteTimer = 0;
       this.jumpBuffer = 0;
+    if (input.jump && this.grounded) {
+      this.vy = -JUMP_FORCE;
+      this.grounded = false;
     }
 
     this.vy = Math.min(this.vy + GRAVITY, MAX_FALL);
@@ -287,6 +301,7 @@ function checkHazards() {
   for (const h of hazards) {
     const hitbox = hazardHitbox(h);
     if (player.intersects(hitbox)) {
+    if (player.intersects(h)) {
       player.takeDamage();
       if (player.hp === 0) return;
       player.vy = -10;
@@ -359,6 +374,7 @@ function handleKey(e, isDown) {
     input.jump = isDown;
     if (isDown) player.queueJump();
   }
+  if (['ArrowUp', 'w', 'W', ' '].includes(e.key)) input.jump = isDown;
 }
 
 window.addEventListener('keydown', (e) => {
