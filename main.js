@@ -7,6 +7,12 @@ const restartBtn = document.getElementById('restart');
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 const WORLD_WIDTH = 3200;
+const GRAVITY = 0.6;
+const MOVE_SPEED = 6;
+const JUMP_FORCE = 16;
+const MAX_FALL = 16;
+const COYOTE_FRAMES = 10;
+
 const GRAVITY = 0.65;
 const MOVE_SPEED = 4.2;
 const JUMP_FORCE = 12.5;
@@ -45,6 +51,21 @@ const coins = [
 ];
 
 const hazards = [
+  { x: 620, y: HEIGHT - 72, w: 90, h: 72 },
+  { x: 1600, y: HEIGHT - 72, w: 70, h: 72 },
+  { x: 2320, y: HEIGHT - 72, w: 120, h: 72 },
+];
+
+function hazardHitbox(h) {
+  return {
+    x: h.x + 6,
+    y: h.y - 12,
+    w: h.w - 12,
+    h: h.h + 18,
+  };
+}
+
+
   { x: 620, y: HEIGHT - 40, w: 90, h: 32 },
   { x: 1600, y: HEIGHT - 40, w: 70, h: 32 },
   { x: 2320, y: HEIGHT - 40, w: 120, h: 32 },
@@ -66,6 +87,8 @@ class Player {
     this.hp = 3;
     this.score = 0;
     this.hurtCooldown = 0;
+    this.coyoteTimer = 0;
+    this.jumpBuffer = 0;
   }
 
   update(delta) {
@@ -73,6 +96,11 @@ class Player {
     if (input.left) this.vx -= MOVE_SPEED;
     if (input.right) this.vx += MOVE_SPEED;
 
+    if (this.jumpBuffer > 0 && (this.grounded || this.coyoteTimer > 0)) {
+      this.vy = -JUMP_FORCE;
+      this.grounded = false;
+      this.coyoteTimer = 0;
+      this.jumpBuffer = 0;
     if (input.jump && this.grounded) {
       this.vy = -JUMP_FORCE;
       this.grounded = false;
@@ -85,11 +113,21 @@ class Player {
     this.y += this.vy * delta;
     this.handleVerticalCollisions();
 
+    this.coyoteTimer = this.grounded
+      ? COYOTE_FRAMES
+      : Math.max(0, this.coyoteTimer - delta);
+
+    this.jumpBuffer = Math.max(0, this.jumpBuffer - delta);
+
     this.x = Math.max(0, Math.min(WORLD_WIDTH - this.w, this.x));
 
     if (this.hurtCooldown > 0) {
       this.hurtCooldown -= delta * 16;
     }
+  }
+
+  queueJump() {
+    this.jumpBuffer = COYOTE_FRAMES;
   }
 
   handleHorizontalCollisions() {
@@ -261,6 +299,8 @@ function checkCoinCollection() {
 
 function checkHazards() {
   for (const h of hazards) {
+    const hitbox = hazardHitbox(h);
+    if (player.intersects(hitbox)) {
     if (player.intersects(h)) {
       player.takeDamage();
       if (player.hp === 0) return;
@@ -330,6 +370,10 @@ function gameLoop(timestamp) {
 function handleKey(e, isDown) {
   if (['ArrowLeft', 'a', 'A'].includes(e.key)) input.left = isDown;
   if (['ArrowRight', 'd', 'D'].includes(e.key)) input.right = isDown;
+  if (['ArrowUp', 'w', 'W', ' '].includes(e.key)) {
+    input.jump = isDown;
+    if (isDown) player.queueJump();
+  }
   if (['ArrowUp', 'w', 'W', ' '].includes(e.key)) input.jump = isDown;
 }
 
