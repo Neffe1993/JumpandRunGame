@@ -8,9 +8,10 @@ const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 const WORLD_WIDTH = 3200;
 const GRAVITY = 0.6;
-const MOVE_SPEED = 5.1;
-const JUMP_FORCE = 14;
+const MOVE_SPEED = 6;
+const JUMP_FORCE = 16;
 const MAX_FALL = 16;
+const COYOTE_FRAMES = 10;
 
 const input = {
   left: false,
@@ -50,6 +51,15 @@ const hazards = [
   { x: 2320, y: HEIGHT - 72, w: 120, h: 72 },
 ];
 
+function hazardHitbox(h) {
+  return {
+    x: h.x + 6,
+    y: h.y - 12,
+    w: h.w - 12,
+    h: h.h + 18,
+  };
+}
+
 class Player {
   constructor() {
     this.reset();
@@ -67,6 +77,7 @@ class Player {
     this.score = 0;
     this.hurtCooldown = 0;
     this.coyoteTimer = 0;
+    this.jumpBuffer = 0;
   }
 
   update(delta) {
@@ -74,10 +85,11 @@ class Player {
     if (input.left) this.vx -= MOVE_SPEED;
     if (input.right) this.vx += MOVE_SPEED;
 
-    if (input.jump && (this.grounded || this.coyoteTimer > 0)) {
+    if (this.jumpBuffer > 0 && (this.grounded || this.coyoteTimer > 0)) {
       this.vy = -JUMP_FORCE;
       this.grounded = false;
       this.coyoteTimer = 0;
+      this.jumpBuffer = 0;
     }
 
     this.vy = Math.min(this.vy + GRAVITY, MAX_FALL);
@@ -87,13 +99,21 @@ class Player {
     this.y += this.vy * delta;
     this.handleVerticalCollisions();
 
-    this.coyoteTimer = this.grounded ? 8 : Math.max(0, this.coyoteTimer - delta);
+    this.coyoteTimer = this.grounded
+      ? COYOTE_FRAMES
+      : Math.max(0, this.coyoteTimer - delta);
+
+    this.jumpBuffer = Math.max(0, this.jumpBuffer - delta);
 
     this.x = Math.max(0, Math.min(WORLD_WIDTH - this.w, this.x));
 
     if (this.hurtCooldown > 0) {
       this.hurtCooldown -= delta * 16;
     }
+  }
+
+  queueJump() {
+    this.jumpBuffer = COYOTE_FRAMES;
   }
 
   handleHorizontalCollisions() {
@@ -265,7 +285,8 @@ function checkCoinCollection() {
 
 function checkHazards() {
   for (const h of hazards) {
-    if (player.intersects(h)) {
+    const hitbox = hazardHitbox(h);
+    if (player.intersects(hitbox)) {
       player.takeDamage();
       if (player.hp === 0) return;
       player.vy = -10;
@@ -334,7 +355,10 @@ function gameLoop(timestamp) {
 function handleKey(e, isDown) {
   if (['ArrowLeft', 'a', 'A'].includes(e.key)) input.left = isDown;
   if (['ArrowRight', 'd', 'D'].includes(e.key)) input.right = isDown;
-  if (['ArrowUp', 'w', 'W', ' '].includes(e.key)) input.jump = isDown;
+  if (['ArrowUp', 'w', 'W', ' '].includes(e.key)) {
+    input.jump = isDown;
+    if (isDown) player.queueJump();
+  }
 }
 
 window.addEventListener('keydown', (e) => {
